@@ -5,5 +5,9 @@ export interface NotificationPayload {
     type: NotificationChannel;
     body: string;
     cta: string;
-    createdAt: Date;
+    createdAt: Date | string;
+    deviceToken?: string;
+    email?: string;
+    phone?: string;
+    userId?: string;
 }
