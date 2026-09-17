@@ -1,38 +1,31 @@
 import Redis from "ioredis";
-
-interface config {
-    ios_queue_url: string;
-    android_queue_url: string;
-    sms_queue_url: string;
-    mail_queue_url: string;
-}
+import type { NotificationChannel, NotificationPayload } from "../types/payload";
 
 export class Queue {
-    private ios_queue: Redis;
-    private android_queue: Redis;
-    private sms_queue: Redis;
-    private mail_queue: Redis;
+    private q: Redis;
 
-    constructor(cfg: config) {
-        this.ios_queue = new Redis(cfg.ios_queue_url);
-        this.android_queue = new Redis(cfg.android_queue_url);
-        this.sms_queue = new Redis(cfg.sms_queue_url);
-        this.mail_queue = new Redis(cfg.mail_queue_url);
+    constructor(redisUrl: string) {
+        this.q = new Redis(redisUrl, {
+            enableOfflineQueue: false,
+            retryStrategy: (times) => {
+                if (times > 5) {
+                    return null;
+                }
+                return Math.min(times * 500, 2000);
+            },
+        });
     }
 
-    getIOSQueue(): Redis {
-        return this.ios_queue;
+    getMessageQueue(): Redis {
+        return this.q;
     }
 
-    getAndroidQueue(): Redis {
-        return this.android_queue;
-    }
-
-    getSMSQueue(): Redis {
-        return this.sms_queue;
-    }
-
-    getMailQueue(): Redis {
-        return this.mail_queue;
+    async enqueueMessage(queueName: NotificationChannel, payload: NotificationPayload): Promise<string | null> {
+        try {
+            return await this.q.xadd(queueName, "*", "payload", JSON.stringify(payload));
+        } catch(error) {
+            console.error(`Error enqueueing message to queue ${queueName}:`, error);
+            return null;
+        }
     }
 }
